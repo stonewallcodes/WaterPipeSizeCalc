@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipe Pressure Loss Calculator</title>
+    <style>
+        :root { --primary: #2563eb; --bg: #f8fafc; --text: #1e293b; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: 2rem; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        h1 { margin-top: 0; color: var(--primary); font-size: 1.5rem; border-bottom: 2px solid var(--bg); padding-bottom: 1rem; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+        .field { display: flex; flex-direction: column; }
+        label { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.25rem; }
+        input, select { padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 1rem; }
+        button { width: 100%; background: var(--primary); color: white; border: none; padding: 0.75rem; border-radius: 4px; font-weight: 600; cursor: pointer; margin-top: 1rem; }
+        button:hover { background: #1d4ed8; }
+        #results { margin-top: 2rem; padding: 1rem; border-radius: 4px; display: none; }
+        .success { background: #f0fdf4; border: 1px solid #bbf7d0; }
+        .error { background: #fef2f2; border: 1px solid #fecaca; display: block !important; }
+        .res-row { display: flex; justify-content: space-between; padding: 0.25rem 0; border-bottom: 1px solid #e2e8f0; }
+        .res-row:last-child { border-bottom: none; }
+        .warning { color: #991b1b; font-weight: bold; font-size: 0.85rem; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Pipe Sizing Calculator</h1>
+    <p style="font-size: 0.85rem; color: #64748b;">Based on Hazen-Williams Equation</p>
+
+    <div class="field" style="margin-bottom: 1rem;">
+        <label>Material Type</label>
+        <select id="material"></select>
+    </div>
+
+    <div class="grid">
+        <div class="field">
+            <label>Length (ft)</label>
+            <input type="number" id="length" value="100" step="1">
+        </div>
+        <div class="field">
+            <label>Flow Rate (GPM)</label>
+            <input type="number" id="flow" value="10" step="0.1">
+        </div>
+        <div class="field">
+            <label>Start Pressure (psi)</label>
+            <input type="number" id="startP" value="60" min="10" max="200">
+        </div>
+        <div class="field">
+            <label>Min Outlet Pressure (psi)</label>
+            <input type="number" id="minP" value="40">
+        </div>
+        <div class="field">
+            <label>Max Velocity (ft/s)</label>
+            <input type="number" id="maxV" value="8" step="0.1">
+        </div>
+    </div>
+
+    <button onclick="calculate()">Calculate Recommended Size</button>
+
+    <div id="results"></div>
+</div>
+
+<script>
+// Data structure derived from your CSV
+const pipeData = [
+    { type: "CTS PEX OR PE", c: 150, sizes: [
+        { id: 0.475, name: "1/2 inch PEX" }, { id: 0.671, name: "3/4 inch PEX" }, { id: 0.875, name: "1 inch PEX" },
+        { id: 1.135, name: "1-1/4 inch PEX" }, { id: 1.328, name: "1-1/2 inch PEX" }, { id: 1.623, name: "2 inch PEX" }
+    ]},
+    { type: "PVC SCH 40", c: 150, sizes: [
+        { id: 0.622, name: "1/2 inch PVC SCH 40" }, { id: 0.824, name: "3/4 inch PVC SCH 40" }, { id: 1.029, name: "1 inch PVC SCH 40" },
+        { id: 1.360, name: "1-1/4 inch PVC SCH 40" }, { id: 1.590, name: "1-1/2 inch PVC SCH 40" }, { id: 2.047, name: "2 inch PVC SCH 40" }
+    ]},
+    { type: "COPPER", c: 140, sizes: [
+        { id: 0.545, name: "1/2 inch Copper L" }, { id: 0.785, name: "3/4 inch Copper L" }, { id: 1.025, name: "1 inch Copper L" },
+        { id: 1.265, name: "1-1/4 inch Copper L" }, { id: 1.505, name: "1-1/2 inch Copper L" }, { id: 1.939, name: "2 inch Copper L" }
+    ]},
+    { type: "STEEL", c: 120, sizes: [
+        { id: 0.622, name: "1/2 inch Steel" }, { id: 0.824, name: "3/4 inch Steel" }, { id: 1.049, name: "1 inch Steel" },
+        { id: 1.380, name: "1-1/4 inch Steel" }, { id: 1.610, name: "1-1/2 inch Steel" }, { id: 2.067, name: "2 inch Steel" }
+    ]}
+];
+
+// Initialize Material Dropdown
+const select = document.getElementById('material');
+pipeData.forEach((m, idx) => {
+    let opt = document.createElement('option');
+    opt.value = idx;
+    opt.innerHTML = `${m.type} (C=${m.c})`;
+    select.appendChild(opt);
+});
+
+function calculate() {
+    const material = pipeData[document.getElementById('material').value];
+    const L = parseFloat(document.getElementById('length').value);
+    const Q = parseFloat(document.getElementById('flow').value);
+    const startP = parseFloat(document.getElementById('startP').value);
+    const minP = parseFloat(document.getElementById('minP').value);
+    const maxV = parseFloat(document.getElementById('maxV').value);
+    
+    const resDiv = document.getElementById('results');
+    let found = null;
+
+    // Search logic equivalent to your search_material function
+    for (let pipe of material.sizes) {
+        // Velocity: (0.4085 * GPM) / ID^2
+        let velocity = (0.4085 * Q) / Math.pow(pipe.id, 2);
+        
+        if (velocity <= maxV) {
+            // Pressure Loss (Hazen-Williams): 10.67 * L * Q^1.852 / (C^1.852 * D^4.87)
+            // Note: Your C code uses Q^2, C^2, D^5 for simplification. I will keep your C logic:
+            let loss = (10.67 * L * Math.pow(Q, 2)) / (Math.pow(material.c, 2) * Math.pow(pipe.id, 5));
+            let endP = startP - loss;
+
+            if (endP >= minP) {
+                found = { ...pipe, velocity, loss, endP };
+                break; 
+            }
+        }
+    }
+
+    if (found) {
+        resDiv.className = "success";
+        resDiv.style.display = "block";
+        resDiv.innerHTML = `
+            <strong>Recommended: ${found.name}</strong>
+            <div class="res-row"><span>Inside Diameter:</span> <span>${found.id.toFixed(3)}"</span></div>
+            <div class="res-row"><span>Velocity:</span> <span>${found.velocity.toFixed(2)} ft/s</span></div>
+            <div class="res-row"><span>Pressure Loss:</span> <span>${found.loss.toFixed(4)} psi</span></div>
+            <div class="res-row"><span>End Pressure:</span> <span>${found.endP.toFixed(4)} psi</span></div>
+            ${found.endP < 0 ? '<p class="warning">CRITICAL: Negative pressure!</p>' : ''}
+        `;
+    } else {
+        resDiv.className = "error";
+        resDiv.innerHTML = "No pipe size found meeting both velocity and pressure requirements.";
+    }
+}
+</script>
+
+</body>
+</html>
