@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Irrigation & Pipe Sizing Calculator</title>
+    <title>Water Pipe Sizing Calculator</title>
     <style>
         :root { --primary: #2d6a4f; --bg: #f8fafc; --text: #1e293b; }
         body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: 1.5rem; }
@@ -69,20 +69,20 @@ Disclaimer: This Pipe Sizing & Pressure Loss Calculator is a mathematical model 
 <script>
 const pipeData = [
     { type: "PEX-A / Poly Pipe", c: 150, sizes: [
-        { id: 0.475, name: "1/2\" PEX" }, { id: 0.671, name: "3/4\" PEX" }, { id: 0.875, name: "1\" PEX" },
-        { id: 1.135, name: "1-1/4\" PEX" }, { id: 1.328, name: "1-1/2\" PEX" }, { id: 1.623, name: "2\" PEX" }
+        { id: 0.475, name: "1/2\" PEX or Poly" }, { id: 0.671, name: "3/4\" PEX or Poly" }, { id: 0.875, name: "1\" PEX or Poly" },
+        { id: 1.135, name: "1-1/4\" PEX or Poly" }, { id: 1.328, name: "1-1/2\" PEX or Poly" }, { id: 1.623, name: "2\" PEX or Poly" }
     ]},
     { type: "PVC Schedule 40", c: 150, sizes: [
         { id: 0.622, name: "1/2\" PVC" }, { id: 0.824, name: "3/4\" PVC" }, { id: 1.029, name: "1\" PVC" },
-        { id: 1.360, name: "1.25\" PVC" }, { id: 1.590, name: "1.5\" PVC" }, { id: 2.047, name: "2\" PVC" }
+        { id: 1.360, name: "1 1/4\" PVC" }, { id: 1.590, name: "1 1/2\" PVC" }, { id: 2.047, name: "2\" PVC" }
     ]},
     { type: "Copper Type L", c: 140, sizes: [
         { id: 0.545, name: "1/2\" Copper" }, { id: 0.785, name: "3/4\" Copper" }, { id: 1.025, name: "1\" Copper" },
-        { id: 1.265, name: "1.25\" Copper" }, { id: 1.505, name: "1.5\" Copper" }, { id: 1.939, name: "2\" Copper" }
+        { id: 1.265, name: "1 1/4\" Copper" }, { id: 1.505, name: "1 1/2\" Copper" }, { id: 1.939, name: "2\" Copper" }
     ]},
     { type: "Galvanized Steel", c: 100, sizes: [
         { id: 0.622, name: "1/2\" Steel" }, { id: 0.824, name: "3/4\" Steel" }, { id: 1.049, name: "1\" Steel" },
-        { id: 2.067, name: "2\" Steel" }
+        { id: 1.660, name: "1 1/4\" Steel" } { id: 1.900, name: "1 1/2\" Steel" } { id: 2.067, name: "2\" Steel" }
     ]}
 ];
 
