@@ -19,13 +19,15 @@
         .res-row { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid #dcfce7; }
         .res-row:last-child { border-bottom: none; }
         .error { background: #fef2f2 !important; border-color: #fecaca !important; color: #991b1b; }
+        .hint { font-size: 0.75rem; color: #64748b; font-weight: normal; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>Water Pipe Sizing & Pressure Loss Calculator</h1>
-    <h4>Based on the Hazen-Williams Formula. Ideal for residential plumbing and irrigation systems.</h4>
+    <h4>Ideal For Residential Plumbing and Irrigation Systems.</h4>
+    
     <div class="field">
         <label>Pipe Material (C-Factor)</label>
         <select id="material" onchange="updateCFactor()"></select>
@@ -39,6 +41,10 @@
         <div class="field">
             <label>Pipe Length (Feet)</label>
             <input type="number" id="length" value="100">
+        </div>
+        <div class="field">
+            <label>Elevation Change (Feet) <br><span class="hint">(+ for Uphill, - for Downhill)</span></label>
+            <input type="number" id="elevation" value="0">
         </div>
         <div class="field">
             <label>Flow Rate (GPM)</label>
@@ -62,19 +68,28 @@
 
     <div id="results"></div>
      
-Disclaimer: This Pipe Sizing & Pressure Loss Calculator is a mathematical model provided for reference only. It is intended for preliminary analysis and design assistance. It is not a substitute for the professional judgment of a licensed engineer or contractor.
+    <p style="font-size: 0.7rem; margin-top: 20px; color: #64748b;">
+    Disclaimer: This tool is a mathematical model based on the Hazen-Williams Formula and is for preliminary analysis only. Elevation loss is calculated at 0.433 PSI per foot.
+    </p>
 </div>
-
 
 <script>
 const pipeData = [
-    { type: "PEX-A / CTS Poly Pipe", c: 150, sizes: [
+    { type: "PEX / CTS Poly Pipe (SDR 9)", c: 150, sizes: [
         { id: 0.475, name: "1/2\" PEX or Poly" }, { id: 0.671, name: "3/4\" PEX or Poly" }, { id: 0.875, name: "1\" PEX or Poly" },
         { id: 1.135, name: "1-1/4\" PEX or Poly" }, { id: 1.328, name: "1-1/2\" PEX or Poly" }, { id: 1.623, name: "2\" PEX or Poly" }
+    ]},
+    { type: "IPS Poly SDR 11", c: 150, sizes: [
+        { id: 0.671, name: "1/2\" Poly" }, { id: 0.860, name: "3/4\" Poly" }, { id: 1.075, name: "1\" Poly" },
+        { id: 1.358, name: "1 1/4\" Poly" }, { id: 1.554, name: "1 1/2\" Poly" }, { id: 1.943, name: "2\" Poly" }
     ]},
     { type: "PVC Schedule 40", c: 150, sizes: [
         { id: 0.622, name: "1/2\" PVC" }, { id: 0.824, name: "3/4\" PVC" }, { id: 1.029, name: "1\" PVC" },
         { id: 1.360, name: "1 1/4\" PVC" }, { id: 1.590, name: "1 1/2\" PVC" }, { id: 2.047, name: "2\" PVC" }
+    ]},
+    { type: "PVC Schedule 80", c: 150, sizes: [ 
+        { id: 0.526, name: "1/2\" SCH 80 PVC" }, { id: 0.722, name: "3/4\" SCH 80 PVC" }, { id: 0.936, name: "1\" SCH 80 PVC" }, 
+        { id: 1.255, name: "1 1/4\" SCH 80 PVC" }, { id: 1.476, name: "1 1/2\" SCH 80 PVC" }, { id: 1.913, name: "2\" SCH 80 PVC" } 
     ]},
     { type: "Copper Type L", c: 140, sizes: [
         { id: 0.545, name: "1/2\" Copper" }, { id: 0.785, name: "3/4\" Copper" }, { id: 1.025, name: "1\" Copper" },
@@ -83,6 +98,10 @@ const pipeData = [
     { type: "Galvanized Steel", c: 100, sizes: [
         { id: 0.622, name: "1/2\" Steel" }, { id: 0.824, name: "3/4\" Steel" }, { id: 1.049, name: "1\" Steel" },
         { id: 1.660, name: "1 1/4\" Steel" }, { id: 1.900, name: "1 1/2\" Steel" }, { id: 2.067, name: "2\" Steel" }
+    ]},
+    { type: "Drip Tube (Polyethylene)", c: 140, sizes: [ 
+        { id: 0.170, name: "1/4\" Micro-Tubing" }, { id: 0.600, name: "1/2\" Poly Tubing" }, 
+        { id: 0.820, name: "3/4\" Poly Tubing" }, { id: 1.050, name: "1\" Poly Tubing" } 
     ]},
 ];
 
@@ -104,6 +123,7 @@ updateCFactor();
 function calculate() {
     const material = pipeData[selectEl.value];
     const L = parseFloat(document.getElementById('length').value);
+    const elevChange = parseFloat(document.getElementById('elevation').value) || 0;
     const Q = parseFloat(document.getElementById('flow').value);
     const startP = parseFloat(document.getElementById('startP').value);
     const minP = parseFloat(document.getElementById('minP').value);
@@ -114,16 +134,31 @@ function calculate() {
     resDiv.className = ""; 
     let found = null;
 
+    // Elevation PSI change: gain height = lose pressure. 
+    // 1 foot vertical = 0.433 PSI
+    const elevPsiAdjustment = elevChange * 0.433;
+
     for (let pipe of material.sizes) {
+        // Velocity (FPS) = (0.4085 * GPM) / d^2
         let vel = (0.4085 * Q) / Math.pow(pipe.id, 2);
         
         if (vel <= maxV) {
-            let headLoss = (10.67 * L * Math.pow(Q, 1.852)) / (Math.pow(C, 1.852) * Math.pow(pipe.id, 4.87));
-            let psiLoss = headLoss * 0.433;
-            let finalP = startP - psiLoss;
+            // Friction Head Loss (Feet) using Hazen-Williams
+            let frictionHeadLoss = (10.67 * L * Math.pow(Q, 1.852)) / (Math.pow(C, 1.852) * Math.pow(pipe.id, 4.87));
+            let frictionPsiLoss = frictionHeadLoss * 0.433;
+            
+            let totalPsiLoss = frictionPsiLoss + elevPsiAdjustment;
+            let finalP = startP - totalPsiLoss;
 
             if (finalP >= minP) {
-                found = { ...pipe, vel, psiLoss, finalP };
+                found = { 
+                    ...pipe, 
+                    vel, 
+                    frictionPsiLoss, 
+                    elevPsiAdjustment, 
+                    totalPsiLoss, 
+                    finalP 
+                };
                 break;
             }
         }
@@ -131,15 +166,17 @@ function calculate() {
 
     resDiv.style.display = "block";
     if (found) {
+        const elevText = found.elevPsiAdjustment >= 0 ? "Loss" : "Gain";
         resDiv.innerHTML = `
-            <strong style="color:var(--primary);">Recommended Size: ${found.name}</strong>
+            <strong style="color:var(--primary); font-size:1.1rem;">Recommended Size: ${found.name}</strong>
             <div class="res-row"><span>Velocity:</span> <span>${found.vel.toFixed(2)} ft/s</span></div>
-            <div class="res-row"><span>Pressure Loss:</span> <span>${found.psiLoss.toFixed(2)} PSI</span></div>
-            <div class="res-row"><span>Outlet Pressure:</span> <span>${found.finalP.toFixed(2)} PSI</span></div>
+            <div class="res-row"><span>Friction Loss:</span> <span>${found.frictionPsiLoss.toFixed(2)} PSI</span></div>
+            <div class="res-row"><span>Elevation ${elevText}:</span> <span>${Math.abs(found.elevPsiAdjustment).toFixed(2)} PSI</span></div>
+            <div class="res-row" style="border-top: 1px solid #aaa; font-weight:bold;"><span>Outlet Pressure:</span> <span>${found.finalP.toFixed(2)} PSI</span></div>
         `;
     } else {
         resDiv.classList.add("error");
-        resDiv.innerHTML = "<strong>Error:</strong> No pipe size found that keeps velocity under " + maxV + " FPS and satisfies the " + minP + " PSI minimum requirement.";
+        resDiv.innerHTML = `<strong>Error:</strong> No pipe size found. Try a larger material, higher start pressure, or lower flow rate. <br><br><small>Final pressure would be below ${minP} PSI or velocity above ${maxV} FPS.</small>`;
     }
 }
 </script>
